@@ -1,0 +1,25 @@
+package queue
+
+type QueueType string
+
+const (
+	QueueTypeStandard QueueType = "standard"
+	QueueTypeFIFO     QueueType = "fifo"
+)
+
+type OpType int
+
+const (
+	INSERT OpType = iota
+	PEEK
+	DELETE
+	REQUEUE
+)
+
+type Code int
+
+const (
+	OK Code = iota
+	EMPTY_QUEUE
+	EMPTY_DEAD_LETTER_QUEUE
+)
