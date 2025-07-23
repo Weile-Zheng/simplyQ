@@ -3,24 +3,25 @@ package queue
 import "time"
 
 type Message struct {
-	ID   string
-	Body string
+	ID        string
+	Body      string
+	TimeStamp time.Time
 }
 
 type Queue struct {
+	ID              string
 	QueueConfig     QueueConfig
 	Messages        []Message
 	DeadLetterQueue []Message
 }
 
 type QueueConfig struct {
-	ID                string
 	Name              string
 	Type              QueueType
 	RetentionPeriod   time.Duration
 	VisibilityTimeout time.Duration
-	MaxReceiveCount   int
-	MaxMessageSize    int
+	MaxReceiveCount   uint16
+	MaxMessageSize    uint32
 }
 
 type Request struct {
@@ -61,8 +62,8 @@ func (q *QueueIO) PeekQueue(req Request) Response {
 	return <-response
 }
 
-// DeleteQueue sends a delete request to the queue and waits for a response.
-func (q *QueueIO) DeleteQueue(req Request) Response {
+// RemoveQueue sends a delete request to the queue and waits for a response.
+func (q *QueueIO) RemoveQueue(req Request) Response {
 	response := make(chan Response)
 	q.SendChan <- Request{
 		Type:    DELETE,
@@ -87,7 +88,7 @@ func (q *QueueIO) Close() {
 	close(q.End)
 }
 
-func MakeQueue(config QueueConfig) QueueIO {
+func MakeQueue(id string, config QueueConfig) QueueIO {
 	send, end := make(chan Request), make(chan any)
 	queueIO := QueueIO{
 		SendChan: send,
@@ -96,9 +97,12 @@ func MakeQueue(config QueueConfig) QueueIO {
 
 	queue := Queue{
 		QueueConfig:     config,
+		ID:              id,
 		Messages:        []Message{},
 		DeadLetterQueue: []Message{},
 	}
+
+	queueHeadReceiveCount := uint16(0) // the number of times the head message has been received.
 
 	go func() {
 		for {
@@ -113,8 +117,15 @@ func MakeQueue(config QueueConfig) QueueIO {
 					}
 				case PEEK:
 					if len(queue.Messages) > 0 {
+						queueHeadReceiveCount++
+						message := queue.Messages[0]
+						if queueHeadReceiveCount == queue.QueueConfig.MaxReceiveCount {
+							// Move the message to the dead letter queue
+							queue.DeadLetterQueue = append(queue.DeadLetterQueue, queue.Messages[0])
+							queue.Messages = queue.Messages[1:]
+						}
 						req.Result <- Response{
-							Message: queue.Messages[0],
+							Message: message,
 							Code:    OK,
 						}
 					} else {
@@ -126,6 +137,7 @@ func MakeQueue(config QueueConfig) QueueIO {
 				case DELETE:
 					if len(queue.Messages) > 0 {
 						queue.Messages = queue.Messages[1:] // O(1) in Go
+						queueHeadReceiveCount = 0           // Reset the receive count after deletion
 						req.Result <- Response{
 							Message: Message{},
 							Code:    OK,

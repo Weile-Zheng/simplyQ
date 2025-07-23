@@ -10,17 +10,16 @@ import (
 )
 
 var config = queue.QueueConfig{
-	ID:                "test-queue",
 	Name:              "Test Queue",
 	Type:              queue.QueueTypeFIFO,
 	RetentionPeriod:   time.Hour,
 	VisibilityTimeout: time.Minute,
-	MaxReceiveCount:   5,
+	MaxReceiveCount:   3,
 	MaxMessageSize:    1024,
 }
 
 func TestMakeQueue(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+	queueIO := queue.MakeQueue("id", config)
 	defer queueIO.Close()
 
 	// Test that queue is created successfully
@@ -33,7 +32,7 @@ func TestMakeQueue(t *testing.T) {
 }
 
 func TestInsertQueue(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+	queueIO := queue.MakeQueue("id", config)
 	defer queueIO.Close()
 
 	message := queue.Message{
@@ -59,7 +58,7 @@ func TestInsertQueue(t *testing.T) {
 }
 
 func TestPeekQueue(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+	queueIO := queue.MakeQueue("id", config)
 	defer queueIO.Close()
 
 	// Test peek on empty queue
@@ -92,13 +91,13 @@ func TestPeekQueue(t *testing.T) {
 	}
 }
 
-func TestDeleteQueue(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+func TestRemoveQueue(t *testing.T) {
+	queueIO := queue.MakeQueue("id", config)
 	defer queueIO.Close()
 
 	// Test delete on empty queue
 	req := queue.Request{}
-	response := queueIO.DeleteQueue(req)
+	response := queueIO.RemoveQueue(req)
 	if response.Code != queue.EMPTY_QUEUE {
 		t.Errorf("Expected EMPTY_QUEUE, got %v", response.Code)
 	}
@@ -111,7 +110,7 @@ func TestDeleteQueue(t *testing.T) {
 	insertReq := queue.Request{Message: message}
 	queueIO.InsertQueue(insertReq)
 
-	response = queueIO.DeleteQueue(req)
+	response = queueIO.RemoveQueue(req)
 	if response.Code != queue.OK {
 		t.Errorf("Expected OK, got %v", response.Code)
 	}
@@ -124,7 +123,7 @@ func TestDeleteQueue(t *testing.T) {
 }
 
 func TestRequeueQueue(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+	queueIO := queue.MakeQueue("id", config)
 	defer queueIO.Close()
 
 	// Test requeue on empty dead letter queue
@@ -136,7 +135,7 @@ func TestRequeueQueue(t *testing.T) {
 }
 
 func TestQueueFIFOBehavior(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+	queueIO := queue.MakeQueue("id", config)
 	defer queueIO.Close()
 
 	// Insert multiple messages
@@ -160,7 +159,7 @@ func TestQueueFIFOBehavior(t *testing.T) {
 
 	// Delete should remove first message
 	deleteReq := queue.Request{}
-	queueIO.DeleteQueue(deleteReq)
+	queueIO.RemoveQueue(deleteReq)
 
 	// Peek should now return second message
 	response = queueIO.PeekQueue(peekReq)
@@ -168,8 +167,10 @@ func TestQueueFIFOBehavior(t *testing.T) {
 		t.Errorf("Expected second message after delete, got %s", response.Message.ID)
 	}
 }
+
 func TestConcurrentOperations(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+	queueIO := queue.MakeQueue("id", config)
+
 	defer queueIO.Close()
 
 	// Test concurrent inserts
@@ -202,7 +203,6 @@ func TestConcurrentOperations(t *testing.T) {
 		t.Errorf("Expected OK after concurrent inserts, got %v", response.Code)
 	}
 
-	// Add more comprehensive checks
 	// Count messages to verify all were inserted
 	messageCount := 0
 	for {
@@ -211,7 +211,7 @@ func TestConcurrentOperations(t *testing.T) {
 			break
 		}
 		messageCount++
-		deleteResp := queueIO.DeleteQueue(queue.Request{})
+		deleteResp := queueIO.RemoveQueue(queue.Request{})
 		if deleteResp.Code != queue.OK {
 			t.Errorf("Failed to delete message %d", messageCount)
 		}
@@ -222,9 +222,9 @@ func TestConcurrentOperations(t *testing.T) {
 	}
 }
 
-// Add a more thorough concurrent test
 func TestConcurrentMixedOperations(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+	queueIO := queue.MakeQueue("id", config)
+
 	defer queueIO.Close()
 
 	// Pre-populate with some messages
@@ -254,7 +254,7 @@ func TestConcurrentMixedOperations(t *testing.T) {
 	// Concurrent deletes
 	for i := 0; i < 10; i++ {
 		go func() {
-			response := queueIO.DeleteQueue(queue.Request{})
+			response := queueIO.RemoveQueue(queue.Request{})
 			if response.Code == queue.OK {
 				atomic.AddInt32(&deleteCount, 1)
 			}
@@ -278,9 +278,6 @@ func TestConcurrentMixedOperations(t *testing.T) {
 		<-done
 	}
 
-	t.Logf("Operations completed - Inserts: %d, Deletes: %d, Peeks: %d",
-		insertCount, deleteCount, peekCount)
-
 	// Verify queue is still functional
 	testMsg := queue.Message{ID: "final-test", Body: "test"}
 	response := queueIO.InsertQueue(queue.Request{Message: testMsg})
@@ -288,8 +285,9 @@ func TestConcurrentMixedOperations(t *testing.T) {
 		t.Error("Queue not functional after concurrent operations")
 	}
 }
+
 func TestCloseQueue(t *testing.T) {
-	queueIO := queue.MakeQueue(config)
+	queueIO := queue.MakeQueue("id", config)
 
 	// Insert a message
 	message := queue.Message{ID: "msg-1", Body: "Test"}
@@ -304,4 +302,32 @@ func TestCloseQueue(t *testing.T) {
 
 	// Give some time for goroutine to process close
 	time.Sleep(10 * time.Millisecond)
+}
+
+func TestMaxReceive(t *testing.T) {
+	queueIO := queue.MakeQueue("id", config)
+
+	defer queueIO.Close()
+
+	// Insert a message
+	message := queue.Message{ID: "msg-1", Body: "Test"}
+	req := queue.Request{Message: message}
+	response := queueIO.InsertQueue(req)
+	if response.Code != queue.OK {
+		t.Errorf("Expected OK, got %v", response.Code)
+	}
+
+	// Peek the message multiple times
+	for i := 0; i < int(config.MaxReceiveCount); i++ {
+		response = queueIO.PeekQueue(queue.Request{})
+		if response.Code != queue.OK {
+			t.Errorf("Expected OK, got %v", response.Code)
+		}
+	}
+
+	// Now the message should be in the dead letter queue
+	response = queueIO.PeekQueue(queue.Request{})
+	if response.Code != queue.EMPTY_QUEUE {
+		t.Errorf("Expected EMPTY_QUEUE, got %v", response.Code)
+	}
 }
