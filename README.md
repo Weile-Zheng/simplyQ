@@ -1,5 +1,27 @@
 # SimplyQ
-Scalable and reliable distributed message queue 
+
+Scalable and reliable distributed message queue
 
 
-Append Only File, Snapshotting, Log compaction, Lazy Cleanup,
+## Todos
+### Queue
+- Support Multiple Queue
+- Standard & FIFO
+
+### Constraints:
+- Max message size
+- Max receive count
+- VisibilityTimeout
+- Retention Period
+
+### Persistency
+- Append Only File
+- Snapshotting
+- Log compaction
+- Lazy Cleanup
+
+### Disaster Recovery
+- Replication
+
+### Non-Functional
+- High concurrency

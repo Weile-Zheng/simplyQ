@@ -118,18 +118,14 @@ func TestSendMessage(t *testing.T) {
 		Body: "Test message",
 	}
 
-	req := queue.Request{
-		Message: message,
-	}
-
 	// Test successful message send
-	response := qm.SendMessage(queueID, req)
+	response := qm.SendMessage(queueID, message)
 	if response.Code != queue.OK {
 		t.Errorf("Expected OK, got %v", response.Code)
 	}
 
 	// Test sending to non-existent queue
-	response = qm.SendMessage("non-existent", req)
+	response = qm.SendMessage("non-existent", message)
 	if response.Code != queue.QUEUE_NOT_FOUND {
 		t.Errorf("Expected QUEUE_NOT_FOUND, got %v", response.Code)
 	}
@@ -165,8 +161,7 @@ func TestPeekMessage(t *testing.T) {
 		ID:   "msg-1",
 		Body: "Test message",
 	}
-	req := queue.Request{Message: message}
-	qm.SendMessage(queueID, req)
+	qm.SendMessage(queueID, message)
 
 	// Test successful peek
 	response = qm.PeekMessage(queueID)
@@ -204,8 +199,7 @@ func TestDeleteMessage(t *testing.T) {
 	queueID := "queue-" + queueConfig.Name
 
 	// Test delete on empty queue
-	req := queue.Request{}
-	response := qm.DeleteMessage(queueID, req)
+	response := qm.DeleteMessage(queueID, queue.Request{})
 	if response.Code != queue.EMPTY_QUEUE {
 		t.Errorf("Expected EMPTY_QUEUE, got %v", response.Code)
 	}
@@ -215,11 +209,10 @@ func TestDeleteMessage(t *testing.T) {
 		ID:   "msg-1",
 		Body: "Test message",
 	}
-	sendReq := queue.Request{Message: message}
-	qm.SendMessage(queueID, sendReq)
+	qm.SendMessage(queueID, message)
 
 	// Test successful delete
-	response = qm.DeleteMessage(queueID, req)
+	response = qm.DeleteMessage(queueID, queue.Request{})
 	if response.Code != queue.OK {
 		t.Errorf("Expected OK, got %v", response.Code)
 	}
@@ -231,7 +224,7 @@ func TestDeleteMessage(t *testing.T) {
 	}
 
 	// Test delete on non-existent queue
-	response = qm.DeleteMessage("non-existent", req)
+	response = qm.DeleteMessage("non-existent", queue.Request{})
 	if response.Code != queue.QUEUE_NOT_FOUND {
 		t.Errorf("Expected QUEUE_NOT_FOUND, got %v", response.Code)
 	}
@@ -272,9 +265,8 @@ func TestMultipleQueues(t *testing.T) {
 			ID:   fmt.Sprintf("msg-%d", i),
 			Body: fmt.Sprintf("Message %d", i),
 		}
-		req := queue.Request{Message: message}
 
-		response := qm.SendMessage(queueID, req)
+		response := qm.SendMessage(queueID, message)
 		if response.Code != queue.OK {
 			t.Errorf("Failed to send message to queue %d", i)
 		}
@@ -325,8 +317,7 @@ func TestConcurrentQueueOperations(t *testing.T) {
 				ID:   fmt.Sprintf("concurrent-msg-%d", id),
 				Body: fmt.Sprintf("Concurrent message %d", id),
 			}
-			req := queue.Request{Message: message}
-			response := qm.SendMessage(queueID, req)
+			response := qm.SendMessage(queueID, message)
 			if response.Code != queue.OK {
 				t.Errorf("Failed to send concurrent message %d", id)
 			}
@@ -447,8 +438,7 @@ func TestMixedConcurrentOperations(t *testing.T) {
 					ID:   fmt.Sprintf("mixed-msg-%d", id),
 					Body: fmt.Sprintf("Mixed message %d", id),
 				}
-				req := queue.Request{Message: message}
-				qm.SendMessage(queueID, req)
+				qm.SendMessage(queueID, message)
 			case 1: // Peek message
 				qm.PeekMessage(queueID)
 			case 2: // Delete message

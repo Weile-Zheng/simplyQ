@@ -41,45 +41,42 @@ type QueueIO struct {
 }
 
 // InsertQueue sends an insert request to the queue and waits for a response.
-func (q *QueueIO) InsertQueue(req Request) Response {
+func (q *QueueIO) InsertQueue(message Message) Response {
 	response := make(chan Response)
 	q.SendChan <- Request{
 		Type:    INSERT,
-		Message: req.Message,
+		Message: message,
 		Result:  response,
 	}
 	return <-response
 }
 
 // PeekQueue sends a peek request to the queue and waits for a response.
-func (q *QueueIO) PeekQueue(req Request) Response {
+func (q *QueueIO) PeekQueue() Response {
 	response := make(chan Response)
 	q.SendChan <- Request{
-		Type:    PEEK,
-		Message: req.Message,
-		Result:  response,
+		Type:   PEEK,
+		Result: response,
 	}
 	return <-response
 }
 
 // RemoveQueue sends a delete request to the queue and waits for a response.
-func (q *QueueIO) RemoveQueue(req Request) Response {
+func (q *QueueIO) RemoveQueue() Response {
 	response := make(chan Response)
 	q.SendChan <- Request{
-		Type:    DELETE,
-		Message: req.Message,
-		Result:  response,
+		Type:   DELETE,
+		Result: response,
 	}
 	return <-response
 }
 
 // RequeueQueue move a message from the dead letter queue back to the main queue.
-func (q *QueueIO) RequeueQueue(req Request) Response {
+func (q *QueueIO) RequeueQueue() Response {
 	response := make(chan Response)
 	q.SendChan <- Request{
-		Type:    REQUEUE,
-		Message: req.Message,
-		Result:  response,
+		Type:   REQUEUE,
+		Result: response,
 	}
 	return <-response
 }

@@ -52,12 +52,12 @@ func (qm *QueueManager) DeleteQueue(id string) Code {
 // Concurrent operations within the same queues are handled next level down by the queue itself.
 
 // SendMessage sends a message to the specified queue.
-func (qm *QueueManager) SendMessage(queueID string, req Request) Response {
+func (qm *QueueManager) SendMessage(queueID string, message Message) Response {
 	qm.Lock.RLock()
 	defer qm.Lock.RUnlock()
 
 	if queue, exists := qm.Queues[queueID]; exists {
-		return queue.InsertQueue(req)
+		return queue.InsertQueue(message)
 	}
 	return Response{Code: QUEUE_NOT_FOUND, Message: Message{}}
 }
@@ -68,7 +68,7 @@ func (qm *QueueManager) PeekMessage(queueID string) Response {
 	defer qm.Lock.RUnlock()
 
 	if queue, exists := qm.Queues[queueID]; exists {
-		return queue.PeekQueue(Request{})
+		return queue.PeekQueue()
 	}
 	return Response{Code: QUEUE_NOT_FOUND, Message: Message{}}
 }
@@ -79,7 +79,7 @@ func (qm *QueueManager) DeleteMessage(queueID string, req Request) Response {
 	defer qm.Lock.RUnlock()
 
 	if queue, exists := qm.Queues[queueID]; exists {
-		return queue.RemoveQueue(req)
+		return queue.RemoveQueue()
 	}
 	return Response{Code: QUEUE_NOT_FOUND, Message: Message{}}
 }
