@@ -1,6 +1,6 @@
 # SimplyQ
 
-Scalable and reliable distributed message queue
+SimplyQ is a scalable and reliable distributed message queue built on top of Hashicorp's implementation of Raft. 
 
 
 ## Todos

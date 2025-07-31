@@ -6,15 +6,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weilezheng/simplyQ/internal/queue"
+	"github.com/Weile-Zheng/simplyQ/internal/queue"
+	"github.com/Weile-Zheng/simplyQ/internal/queue_manager"
 )
 
 func TestNewQueueManager(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
 
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	if qm.Queues == nil {
 		t.Error("Queues map should not be nil")
@@ -26,10 +27,10 @@ func TestNewQueueManager(t *testing.T) {
 }
 
 func TestCreateQueue(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	queueConfig := queue.QueueConfig{
 		Name:              "TestQueue",
@@ -59,10 +60,10 @@ func TestCreateQueue(t *testing.T) {
 }
 
 func TestDeleteQueue(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	queueConfig := queue.QueueConfig{
 		Name:              "TestQueue",
@@ -95,10 +96,10 @@ func TestDeleteQueue(t *testing.T) {
 }
 
 func TestSendMessage(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	queueConfig := queue.QueueConfig{
 		Name:              "TestQueue",
@@ -132,10 +133,10 @@ func TestSendMessage(t *testing.T) {
 }
 
 func TestPeekMessage(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	queueConfig := queue.QueueConfig{
 		Name:              "TestQueue",
@@ -180,10 +181,10 @@ func TestPeekMessage(t *testing.T) {
 }
 
 func TestDeleteMessage(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	queueConfig := queue.QueueConfig{
 		Name:              "TestQueue",
@@ -199,7 +200,7 @@ func TestDeleteMessage(t *testing.T) {
 	queueID := "queue-" + queueConfig.Name
 
 	// Test delete on empty queue
-	response := qm.DeleteMessage(queueID, queue.Request{})
+	response := qm.PopMessage(queueID)
 	if response.Code != queue.EMPTY_QUEUE {
 		t.Errorf("Expected EMPTY_QUEUE, got %v", response.Code)
 	}
@@ -212,7 +213,7 @@ func TestDeleteMessage(t *testing.T) {
 	qm.SendMessage(queueID, message)
 
 	// Test successful delete
-	response = qm.DeleteMessage(queueID, queue.Request{})
+	response = qm.PopMessage(queueID)
 	if response.Code != queue.OK {
 		t.Errorf("Expected OK, got %v", response.Code)
 	}
@@ -224,17 +225,17 @@ func TestDeleteMessage(t *testing.T) {
 	}
 
 	// Test delete on non-existent queue
-	response = qm.DeleteMessage("non-existent", queue.Request{})
+	response = qm.PopMessage("non-existent")
 	if response.Code != queue.QUEUE_NOT_FOUND {
 		t.Errorf("Expected QUEUE_NOT_FOUND, got %v", response.Code)
 	}
 }
 
 func TestMultipleQueues(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	// Create multiple queues
 	for i := 0; i < 3; i++ {
@@ -287,10 +288,10 @@ func TestMultipleQueues(t *testing.T) {
 }
 
 func TestConcurrentQueueOperations(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	queueConfig := queue.QueueConfig{
 		Name:              "ConcurrentTestQueue",
@@ -334,7 +335,7 @@ func TestConcurrentQueueOperations(t *testing.T) {
 			break
 		}
 		messageCount++
-		deleteResponse := qm.DeleteMessage(queueID, queue.Request{})
+		deleteResponse := qm.PopMessage(queueID)
 		if deleteResponse.Code != queue.OK {
 			t.Errorf("Failed to delete message %d", messageCount)
 		}
@@ -346,10 +347,10 @@ func TestConcurrentQueueOperations(t *testing.T) {
 }
 
 func TestConcurrentQueueCreationDeletion(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	var wg sync.WaitGroup
 	numGoroutines := 10
@@ -404,10 +405,10 @@ func TestConcurrentQueueCreationDeletion(t *testing.T) {
 }
 
 func TestMixedConcurrentOperations(t *testing.T) {
-	config := queue.QueueManagerConfig{
+	config := queue_manager.QueueManagerConfig{
 		Name: "TestManager",
 	}
-	qm := queue.NewQueueManager(config)
+	qm := queue_manager.NewQueueManager(config)
 
 	// Pre-create some queues
 	for i := 0; i < 3; i++ {
@@ -442,7 +443,7 @@ func TestMixedConcurrentOperations(t *testing.T) {
 			case 1: // Peek message
 				qm.PeekMessage(queueID)
 			case 2: // Delete message
-				qm.DeleteMessage(queueID, queue.Request{})
+				qm.PopMessage(queueID)
 			case 3: // Create new queue (might fail if exists)
 				newQueueConfig := queue.QueueConfig{
 					Name:              fmt.Sprintf("NewMixedQueue%d", id),

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weilezheng/simplyQ/internal/queue"
+	"github.com/Weile-Zheng/simplyQ/internal/queue"
 )
 
 var config = queue.QueueConfig{
@@ -119,7 +119,7 @@ func TestRequeueQueue(t *testing.T) {
 	defer queueIO.Close()
 
 	// Test requeue on empty dead letter queue
-	response := queueIO.RequeueQueue()
+	response := queueIO.Requeue()
 	if response.Code != queue.EMPTY_DEAD_LETTER_QUEUE {
 		t.Errorf("Expected EMPTY_DEAD_LETTER_QUEUE, got %v", response.Code)
 	}
@@ -292,14 +292,20 @@ func TestMaxReceive(t *testing.T) {
 	queueIO := queue.MakeQueue("id", config)
 	defer queueIO.Close()
 
-	// Insert a message
+	// Insert two messages
 	message := queue.Message{ID: "msg-1", Body: "Test"}
+	message2 := queue.Message{ID: "msg-2", Body: "Test 2"}
 	response := queueIO.InsertQueue(message)
 	if response.Code != queue.OK {
 		t.Errorf("Expected OK, got %v", response.Code)
 	}
 
-	// Peek the message multiple times
+	response = queueIO.InsertQueue(message2)
+	if response.Code != queue.OK {
+		t.Errorf("Expected OK, got %v", response.Code)
+	}
+
+	// Peek the message multiple times. Max receive count is 3, so it should be moved to dead letter queue after 3 peeks.
 	for i := 0; i < int(config.MaxReceiveCount); i++ {
 		response = queueIO.PeekQueue()
 		if response.Code != queue.OK {
@@ -307,7 +313,21 @@ func TestMaxReceive(t *testing.T) {
 		}
 	}
 
-	// Now the message should be in the dead letter queue
+	// Now the message-1 should be in the dead letter queue, peek should return message-2
+	response = queueIO.PeekQueue()
+	if response.Message.ID != "msg-2" {
+		t.Errorf("Expected message-2, got %s", response.Message.ID)
+	}
+
+	// Peek message-2 maxreceivcount - 1  more times.
+	for i := 0; i < int(config.MaxReceiveCount-1); i++ {
+		response = queueIO.PeekQueue()
+		if response.Code != queue.OK {
+			t.Errorf("Expected OK, got %v", response.Code)
+		}
+	}
+
+	// Now message-2 should be in the dead letter queue, peek should return empty
 	response = queueIO.PeekQueue()
 	if response.Code != queue.EMPTY_QUEUE {
 		t.Errorf("Expected EMPTY_QUEUE, got %v", response.Code)

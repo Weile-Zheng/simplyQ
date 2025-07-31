@@ -14,6 +14,8 @@ const (
 	PEEK
 	DELETE
 	REQUEUE
+	GET_CONFIG
+	UPDATE_CONFIG
 )
 
 type Code int
@@ -25,3 +27,4 @@ const (
 	QUEUE_NOT_FOUND
 	QUEUE_ALREADY_EXISTS
 )
+

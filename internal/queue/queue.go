@@ -1,6 +1,8 @@
 package queue
 
-import "time"
+import (
+	"time"
+)
 
 type Message struct {
 	ID        string
@@ -37,6 +39,7 @@ type Response struct {
 
 type QueueIO struct {
 	SendChan chan<- Request
+	PrintAll <-chan []Message
 	End      chan<- any
 }
 
@@ -71,8 +74,8 @@ func (q *QueueIO) RemoveQueue() Response {
 	return <-response
 }
 
-// RequeueQueue move a message from the dead letter queue back to the main queue.
-func (q *QueueIO) RequeueQueue() Response {
+// Requeue move a message from the dead letter queue back to the main queue.
+func (q *QueueIO) Requeue() Response {
 	response := make(chan Response)
 	q.SendChan <- Request{
 		Type:   REQUEUE,
@@ -81,14 +84,20 @@ func (q *QueueIO) RequeueQueue() Response {
 	return <-response
 }
 
+// SnapshotQueue sends a print request to the queue and returns a list of messages.
+func (q *QueueIO) SnapshotQueue() []Message {
+	return <-q.PrintAll
+}
+
 func (q *QueueIO) Close() {
 	close(q.End)
 }
 
 func MakeQueue(id string, config QueueConfig) QueueIO {
-	send, end := make(chan Request), make(chan any)
+	send, printall, end := make(chan Request), make(chan []Message), make(chan any)
 	queueIO := QueueIO{
 		SendChan: send,
+		PrintAll: printall,
 		End:      end,
 	}
 
@@ -120,6 +129,7 @@ func MakeQueue(id string, config QueueConfig) QueueIO {
 							// Move the message to the dead letter queue
 							queue.DeadLetterQueue = append(queue.DeadLetterQueue, queue.Messages[0])
 							queue.Messages = queue.Messages[1:]
+							queueHeadReceiveCount = 0 // Reset the receive count after moving to dead letter queue
 						}
 						req.Result <- Response{
 							Message: message,
@@ -133,8 +143,8 @@ func MakeQueue(id string, config QueueConfig) QueueIO {
 					}
 				case DELETE:
 					if len(queue.Messages) > 0 {
-						queue.Messages = queue.Messages[1:] // O(1) in Go
-						queueHeadReceiveCount = 0           // Reset the receive count after deletion
+						queue.Messages = queue.Messages[1:]
+						queueHeadReceiveCount = 0 // Reset the receive count after deletion
 						req.Result <- Response{
 							Message: Message{},
 							Code:    OK,
@@ -161,9 +171,12 @@ func MakeQueue(id string, config QueueConfig) QueueIO {
 						}
 					}
 				}
+			case printall <- queue.Messages:
 			case <-end:
 				return
 			}
+
+			// fmt.Printf("Queue %s: \nMessages: %v\nDead Letter Queue: %v\n", queue.ID, queue.Messages, queue.DeadLetterQueue)
 		}
 	}()
 	return queueIO
