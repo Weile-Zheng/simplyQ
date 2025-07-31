@@ -27,7 +27,7 @@ type QueueConfig struct {
 }
 
 type Request struct {
-	Type    OpType
+	Type    opType
 	Message Message
 	Result  chan Response
 }
@@ -175,8 +175,6 @@ func MakeQueue(id string, config QueueConfig) QueueIO {
 			case <-end:
 				return
 			}
-
-			// fmt.Printf("Queue %s: \nMessages: %v\nDead Letter Queue: %v\n", queue.ID, queue.Messages, queue.DeadLetterQueue)
 		}
 	}()
 	return queueIO

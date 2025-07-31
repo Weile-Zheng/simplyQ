@@ -21,15 +21,17 @@ func (f *FSM) Apply(log *raft.Log) interface{} {
 
 	switch command.Type {
 	case queue_manager.CREATE_QUEUE:
-		return f.QueueManager.CreateQueue(queue.DEFAULT_QUEUE_CONFIG)
+		return f.QueueManager.CreateQueue(command.QueueConfig)
 	case queue_manager.DELETE_QUEUE:
 		return f.QueueManager.DeleteQueue(command.QueueID)
 	case queue_manager.SEND_MESSAGE:
-		return f.QueueManager.SendMessage(command.QueueID, queue.Message{Body: command.Message})
+		return f.QueueManager.SendMessage(command.QueueID, command.Message)
 	case queue_manager.PEEK_MESSAGE:
 		return f.QueueManager.PeekMessage(command.QueueID)
 	case queue_manager.POP_MESSAGE:
 		return f.QueueManager.PopMessage(command.QueueID)
+	case queue_manager.VIEW_QUEUE:
+		return f.QueueManager.ViewAllMessages(command.QueueID)
 	}
 	return nil
 }

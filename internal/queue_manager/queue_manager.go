@@ -1,6 +1,7 @@
 package queue_manager
 
 import (
+	"log"
 	"sync"
 
 	"github.com/Weile-Zheng/simplyQ/internal/queue"
@@ -27,7 +28,7 @@ func NewQueueManager(config QueueManagerConfig) QueueManager {
 func (qm *QueueManager) CreateQueue(config queue.QueueConfig) queue.Code {
 	qm.Lock.Lock()
 	defer qm.Lock.Unlock()
-	id := "queue-" + config.Name
+	id := config.Name
 
 	// if queue with the same name exists, return
 	if _, exists := qm.Queues[id]; exists {
@@ -96,6 +97,7 @@ func (qm *QueueManager) ViewAllMessages(queueID string) []queue.Message {
 	if q, exists := qm.Queues[queueID]; exists {
 		return q.SnapshotQueue()
 	}
+	log.Printf("Queue %s not found", queueID)
 	return nil
 }
 

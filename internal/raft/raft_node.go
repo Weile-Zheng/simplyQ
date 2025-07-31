@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Weile-Zheng/simplyQ/internal/queue_manager"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 )
@@ -13,7 +14,7 @@ type RaftNode struct {
 	Raft *raft.Raft
 }
 
-func NewRaftNode(dataDir string, nodeID string, bindAddr string, peers []string) (*RaftNode, error) {
+func NewRaftNode(dataDir string, nodeID string, bindAddr string, peers []string, queueManager *queue_manager.QueueManager) (*RaftNode, error) {
 	// Raft configuration
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
@@ -42,8 +43,10 @@ func NewRaftNode(dataDir string, nodeID string, bindAddr string, peers []string)
 		return nil, err
 	}
 
+	fsm := &FSM{QueueManager: queueManager}
+
 	// Raft system
-	raftNode, err := raft.NewRaft(config, nil, logStore, stableStore, snapshotStore, transport)
+	raftNode, err := raft.NewRaft(config, fsm, logStore, stableStore, snapshotStore, transport)
 	if err != nil {
 		return nil, err
 	}
@@ -62,4 +65,23 @@ func NewRaftNode(dataDir string, nodeID string, bindAddr string, peers []string)
 	}
 
 	return &RaftNode{Raft: raftNode}, nil
+}
+
+// ApplyCommand applies a command to the Raft log.
+func (rn *RaftNode) ApplyCommand(command []byte, timeout time.Duration) (interface{}, error) {
+	future := rn.Raft.Apply(command, timeout)
+	if err := future.Error(); err != nil {
+		return nil, err
+	}
+	return future.Response(), nil
+}
+
+// IsLeader checks if the current node is the leader.
+func (rn *RaftNode) IsLeader() bool {
+	return rn.Raft.State() == raft.Leader
+}
+
+// GetLeader returns the current leader of the Raft cluster.
+func (rn *RaftNode) GetLeader() raft.ServerAddress {
+	return rn.Raft.Leader()
 }

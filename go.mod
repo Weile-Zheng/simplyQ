@@ -4,7 +4,10 @@ go 1.23
 
 toolchain go1.23.4
 
-require go.etcd.io/bbolt v1.4.2
+require (
+	github.com/hashicorp/raft v1.7.3
+	github.com/hashicorp/raft-boltdb v0.0.0-20250701115049-6cdf087e85ed
+)
 
 require (
 	github.com/armon/go-metrics v0.4.1 // indirect
@@ -16,9 +19,8 @@ require (
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
 	github.com/hashicorp/go-msgpack/v2 v2.1.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.0 // indirect
-	github.com/hashicorp/raft v1.7.3 // indirect
-	github.com/hashicorp/raft-boltdb v0.0.0-20250701115049-6cdf087e85ed // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 )

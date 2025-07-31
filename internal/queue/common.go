@@ -2,12 +2,13 @@ package queue
 
 import (
 	"math/rand"
+	"strconv"
 	"time"
 )
 
 func generateRandomID() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return "queue-" + string(r.Intn(1000000))
+	return "queue-" + strconv.Itoa(r.Intn(1000000)) // Corrected conversion
 }
 
 var DEFAULT_QUEUE_CONFIG = QueueConfig{

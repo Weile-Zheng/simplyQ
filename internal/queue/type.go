@@ -7,13 +7,14 @@ const (
 	QueueTypeFIFO     QueueType = "fifo"
 )
 
-type OpType int
+type opType int
 
 const (
-	INSERT OpType = iota
+	INSERT opType = iota
 	PEEK
 	DELETE
 	REQUEUE
+
 	GET_CONFIG
 	UPDATE_CONFIG
 )
@@ -27,4 +28,3 @@ const (
 	QUEUE_NOT_FOUND
 	QUEUE_ALREADY_EXISTS
 )
-
