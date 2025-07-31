@@ -8,7 +8,7 @@ import (
 )
 
 type QueueManager struct {
-	Queues map[string]queue.QueueIO
+	Queues map[string]*queue.QueueIO
 	Lock   sync.RWMutex
 }
 
@@ -19,7 +19,7 @@ type QueueManagerConfig struct {
 // NewQueueManager creates a new QueueManager instance.
 func NewQueueManager(config QueueManagerConfig) QueueManager {
 	return QueueManager{
-		Queues: make(map[string]queue.QueueIO),
+		Queues: make(map[string]*queue.QueueIO),
 		Lock:   sync.RWMutex{},
 	}
 }
@@ -95,34 +95,34 @@ func (qm *QueueManager) ViewAllMessages(queueID string) []queue.Message {
 	defer qm.Lock.RUnlock()
 
 	if q, exists := qm.Queues[queueID]; exists {
-		return q.SnapshotQueue()
+		return q.SnapshotQueue().Messages
 	}
 	log.Printf("Queue %s not found", queueID)
 	return nil
 }
 
-func (qm *QueueManager) ViewAllQueues() map[string][]queue.Message {
+// ViewAllQueues returns a snapshot of all queues and their messages.
+func (qm *QueueManager) ViewAllQueues() map[string]queue.Queue {
 	qm.Lock.Lock() // write lock for taking a snapshot of the all queues.
 	defer qm.Lock.Unlock()
 
-	queuesSnapshot := make(map[string][]queue.Message)
+	queuesSnapshot := make(map[string]queue.Queue)
 	for id, q := range qm.Queues {
 		queuesSnapshot[id] = q.SnapshotQueue()
 	}
 	return queuesSnapshot
 }
 
-func (qm *QueueManager) RestoreAllQueues(queues map[string][]queue.Message) {
+func (qm *QueueManager) RestoreAllQueues(queues map[string]queue.Queue) {
 	qm.Lock.Lock()
 	defer qm.Lock.Unlock()
 
+	restored_queues := make(map[string]*queue.QueueIO)
+
 	for id := range queues {
-		if _, exists := qm.Queues[id]; !exists {
-			qm.Queues[id] = queue.MakeQueue(id, queue.DEFAULT_QUEUE_CONFIG)
-		}
-		q := qm.Queues[id]
-		for _, msg := range queues[id] {
-			q.InsertQueue(msg)
+		restored_queues[id] = queue.MakeQueue(id, queues[id].Config)
+		for _, msg := range queues[id].Messages {
+			restored_queues[id].InsertQueue(msg)
 		}
 	}
 }

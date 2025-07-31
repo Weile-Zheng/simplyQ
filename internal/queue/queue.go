@@ -12,7 +12,7 @@ type Message struct {
 
 type Queue struct {
 	ID              string
-	QueueConfig     QueueConfig
+	Config          QueueConfig
 	Messages        []Message
 	DeadLetterQueue []Message
 }
@@ -39,7 +39,7 @@ type Response struct {
 
 type QueueIO struct {
 	SendChan chan<- Request
-	PrintAll <-chan []Message
+	Snapshot <-chan Queue
 	End      chan<- any
 }
 
@@ -85,24 +85,24 @@ func (q *QueueIO) Requeue() Response {
 }
 
 // SnapshotQueue sends a print request to the queue and returns a list of messages.
-func (q *QueueIO) SnapshotQueue() []Message {
-	return <-q.PrintAll
+func (q *QueueIO) SnapshotQueue() Queue {
+	return <-q.Snapshot
 }
 
 func (q *QueueIO) Close() {
 	close(q.End)
 }
 
-func MakeQueue(id string, config QueueConfig) QueueIO {
-	send, printall, end := make(chan Request), make(chan []Message), make(chan any)
+func MakeQueue(id string, config QueueConfig) *QueueIO {
+	send, snapshot, end := make(chan Request), make(chan Queue), make(chan any)
 	queueIO := QueueIO{
 		SendChan: send,
-		PrintAll: printall,
+		Snapshot: snapshot,
 		End:      end,
 	}
 
 	queue := Queue{
-		QueueConfig:     config,
+		Config:          config,
 		ID:              id,
 		Messages:        []Message{},
 		DeadLetterQueue: []Message{},
@@ -125,7 +125,7 @@ func MakeQueue(id string, config QueueConfig) QueueIO {
 					if len(queue.Messages) > 0 {
 						queueHeadReceiveCount++
 						message := queue.Messages[0]
-						if queueHeadReceiveCount == queue.QueueConfig.MaxReceiveCount {
+						if queueHeadReceiveCount == queue.Config.MaxReceiveCount {
 							// Move the message to the dead letter queue
 							queue.DeadLetterQueue = append(queue.DeadLetterQueue, queue.Messages[0])
 							queue.Messages = queue.Messages[1:]
@@ -171,11 +171,15 @@ func MakeQueue(id string, config QueueConfig) QueueIO {
 						}
 					}
 				}
-			case printall <- queue.Messages:
+			case snapshot <- Queue{
+				ID:              queue.ID,
+				Config:          queue.Config,
+				Messages:        queue.Messages,
+				DeadLetterQueue: queue.DeadLetterQueue}:
 			case <-end:
 				return
 			}
 		}
 	}()
-	return queueIO
+	return &queueIO
 }

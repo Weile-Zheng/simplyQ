@@ -47,7 +47,7 @@ func TestCreateQueue(t *testing.T) {
 		t.Errorf("Expected OK, got %v", code)
 	}
 
-	expectedID := "queue-" + queueConfig.Name
+	expectedID := queueConfig.Name
 	if _, exists := qm.Queues[expectedID]; !exists {
 		t.Error("Queue should exist in manager")
 	}
@@ -76,8 +76,7 @@ func TestDeleteQueue(t *testing.T) {
 
 	// Create a queue first
 	qm.CreateQueue(queueConfig)
-	queueID := "queue-" + queueConfig.Name
-
+	queueID := queueConfig.Name
 	// Test successful deletion
 	code := qm.DeleteQueue(queueID)
 	if code != queue.OK {
@@ -112,8 +111,7 @@ func TestSendMessage(t *testing.T) {
 
 	// Create a queue
 	qm.CreateQueue(queueConfig)
-	queueID := "queue-" + queueConfig.Name
-
+	queueID := queueConfig.Name
 	message := queue.Message{
 		ID:   "msg-1",
 		Body: "Test message",
@@ -149,8 +147,7 @@ func TestPeekMessage(t *testing.T) {
 
 	// Create a queue
 	qm.CreateQueue(queueConfig)
-	queueID := "queue-" + queueConfig.Name
-
+	queueID := queueConfig.Name
 	// Test peek on empty queue
 	response := qm.PeekMessage(queueID)
 	if response.Code != queue.EMPTY_QUEUE {
@@ -197,8 +194,7 @@ func TestDeleteMessage(t *testing.T) {
 
 	// Create a queue
 	qm.CreateQueue(queueConfig)
-	queueID := "queue-" + queueConfig.Name
-
+	queueID := queueConfig.Name
 	// Test delete on empty queue
 	response := qm.PopMessage(queueID)
 	if response.Code != queue.EMPTY_QUEUE {
@@ -261,7 +257,7 @@ func TestMultipleQueues(t *testing.T) {
 
 	// Send messages to different queues
 	for i := 0; i < 3; i++ {
-		queueID := fmt.Sprintf("queue-TestQueue%d", i)
+		queueID := fmt.Sprintf("TestQueue%d", i)
 		message := queue.Message{
 			ID:   fmt.Sprintf("msg-%d", i),
 			Body: fmt.Sprintf("Message %d", i),
@@ -275,7 +271,7 @@ func TestMultipleQueues(t *testing.T) {
 
 	// Verify messages in different queues
 	for i := 0; i < 3; i++ {
-		queueID := fmt.Sprintf("queue-TestQueue%d", i)
+		queueID := fmt.Sprintf("TestQueue%d", i)
 		response := qm.PeekMessage(queueID)
 		if response.Code != queue.OK {
 			t.Errorf("Failed to peek message from queue %d", i)
@@ -304,8 +300,7 @@ func TestConcurrentQueueOperations(t *testing.T) {
 
 	// Create a queue
 	qm.CreateQueue(queueConfig)
-	queueID := "queue-" + queueConfig.Name
-
+	queueID := queueConfig.Name
 	var wg sync.WaitGroup
 	numGoroutines := 10
 
@@ -337,7 +332,7 @@ func TestConcurrentQueueOperations(t *testing.T) {
 		messageCount++
 		deleteResponse := qm.PopMessage(queueID)
 		if deleteResponse.Code != queue.OK {
-			t.Errorf("Failed to delete message %d", messageCount)
+			t.Errorf("Failed to delete message %d with %v", messageCount, deleteResponse.Code)
 		}
 	}
 
@@ -388,7 +383,7 @@ func TestConcurrentQueueCreationDeletion(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
-			queueID := fmt.Sprintf("queue-ConcurrentQueue%d", id)
+			queueID := fmt.Sprintf("ConcurrentQueue%d", id)
 			code := qm.DeleteQueue(queueID)
 			if code != queue.OK {
 				t.Errorf("Failed to delete concurrent queue %d", id)

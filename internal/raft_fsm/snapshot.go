@@ -1,4 +1,4 @@
-package raft
+package raft_fsm
 
 import (
 	"encoding/json"
@@ -8,12 +8,12 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-type Snapshot struct {
-	Queues map[string][]queue.Message
+type RaftSnapshot struct {
+	Queues map[string]queue.Queue
 }
 
 // Persist saves the snapshot to the provided sink.
-func (s *Snapshot) Persist(sink raft.SnapshotSink) error {
+func (s *RaftSnapshot) Persist(sink raft.SnapshotSink) error {
 	data, err := json.Marshal(s.Queues)
 	if err != nil {
 		sink.Cancel()
@@ -29,6 +29,6 @@ func (s *Snapshot) Persist(sink raft.SnapshotSink) error {
 }
 
 // Release releases any resources associated with the snapshot.
-func (s *Snapshot) Release() {
+func (s *RaftSnapshot) Release() {
 	fmt.Printf("Releasing snapshot with %d queues\n", len(s.Queues))
 }

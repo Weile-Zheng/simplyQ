@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Weile-Zheng/simplyQ/internal/queue_manager"
-	raftnode "github.com/Weile-Zheng/simplyQ/internal/raft"
+	raftnode "github.com/Weile-Zheng/simplyQ/internal/raft_fsm"
 	"github.com/hashicorp/raft"
 )
 

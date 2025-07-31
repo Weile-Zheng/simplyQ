@@ -1,4 +1,4 @@
-package raft
+package raft_fsm
 
 import (
 	"encoding/json"
@@ -37,15 +37,15 @@ func (f *FSM) Apply(log *raft.Log) interface{} {
 }
 
 func (f *FSM) Snapshot() (raft.FSMSnapshot, error) {
-	snapshot := Snapshot{f.QueueManager.ViewAllQueues()}
+	snapshot := RaftSnapshot{f.QueueManager.ViewAllQueues()}
 	return &snapshot, nil
 }
 
 func (f *FSM) Restore(rc io.ReadCloser) error {
-	var queues map[string]queue.QueueIO
+	var queues map[string]queue.Queue
 	if err := json.NewDecoder(rc).Decode(&queues); err != nil {
 		return err
 	}
-	f.QueueManager.Queues = queues
+	f.QueueManager.RestoreAllQueues(queues)
 	return nil
 }
