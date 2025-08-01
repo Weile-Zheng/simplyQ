@@ -2,7 +2,6 @@ package raft_fsm
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/Weile-Zheng/simplyQ/internal/queue"
 	"github.com/hashicorp/raft"
@@ -12,7 +11,6 @@ type RaftSnapshot struct {
 	Queues map[string]queue.Queue
 }
 
-// Persist saves the snapshot to the provided sink.
 func (s *RaftSnapshot) Persist(sink raft.SnapshotSink) error {
 	data, err := json.Marshal(s.Queues)
 	if err != nil {
@@ -30,5 +28,5 @@ func (s *RaftSnapshot) Persist(sink raft.SnapshotSink) error {
 
 // Release releases any resources associated with the snapshot.
 func (s *RaftSnapshot) Release() {
-	fmt.Printf("Releasing snapshot with %d queues\n", len(s.Queues))
+	// No additional resources allocated during persist
 }

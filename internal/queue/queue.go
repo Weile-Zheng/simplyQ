@@ -1,8 +1,11 @@
 package queue
 
 /**
- * Queue package provides a simple implementation of a message queue.
+ * Queue package provides a simple implementation of thread safe message queue.
+
+ * 
  */
+
 import (
 	"time"
 )

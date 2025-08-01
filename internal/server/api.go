@@ -8,6 +8,7 @@ import (
 
 	"github.com/Weile-Zheng/simplyQ/internal/queue"
 	"github.com/Weile-Zheng/simplyQ/internal/queue_manager"
+	"github.com/hashicorp/raft"
 )
 
 func (s *QueueServer) pingHandler(w http.ResponseWriter, r *http.Request) {
@@ -32,12 +33,6 @@ func (s *QueueServer) createQueueHandler(w http.ResponseWriter, r *http.Request)
 		QueueConfig: config,
 	}
 
-	if !s.RaftNode.IsLeader() {
-		http.Error(w, fmt.Sprintf("Not the leader. Current leader: %s", s.RaftNode.GetLeader()), http.StatusTemporaryRedirect)
-		return
-	}
-
-	// Apply command via Raft
 	commandBytes, err := json.Marshal(command)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to marshal command: %v", err), http.StatusInternalServerError)
@@ -56,6 +51,7 @@ func (s *QueueServer) createQueueHandler(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// sendMessageHandler handles sending a message to a queue.
 func (s *QueueServer) sendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -74,20 +70,12 @@ func (s *QueueServer) sendMessageHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Create command
 	command := queue_manager.Command{
 		Type:    queue_manager.SEND_MESSAGE,
 		QueueID: queueID,
 		Message: message,
 	}
 
-	// Forward to leader if not the leader
-	if !s.RaftNode.IsLeader() {
-		http.Error(w, fmt.Sprintf("Not the leader. Current leader: %s", s.RaftNode.GetLeader()), http.StatusTemporaryRedirect)
-		return
-	}
-
-	// Apply command via Raft
 	commandBytes, err := json.Marshal(command)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to marshal command: %v", err), http.StatusInternalServerError)
@@ -119,19 +107,11 @@ func (s *QueueServer) peekMessageHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Create command
 	command := queue_manager.Command{
 		Type:    queue_manager.PEEK_MESSAGE,
 		QueueID: queueID,
 	}
 
-	// Forward to leader if not the leader
-	if !s.RaftNode.IsLeader() {
-		http.Error(w, fmt.Sprintf("Not the leader. Current leader: %s", s.RaftNode.GetLeader()), http.StatusTemporaryRedirect)
-		return
-	}
-
-	// Apply command via Raft
 	commandBytes, err := json.Marshal(command)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to marshal command: %v", err), http.StatusInternalServerError)
@@ -172,7 +152,7 @@ func (s *QueueServer) peekMessageHandler(w http.ResponseWriter, r *http.Request)
 	http.Error(w, "Unexpected response type from queue manager", http.StatusInternalServerError)
 }
 
-// popMessageHandler removes a message from a queue
+// popMessageHandler removes the first(current) message from a queue
 func (s *QueueServer) popMessageHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -185,25 +165,11 @@ func (s *QueueServer) popMessageHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	messageID := r.URL.Query().Get("messageID")
-	if messageID == "" {
-		http.Error(w, "Missing message ID", http.StatusBadRequest)
-		return
-	}
-
-	// Create command
 	command := queue_manager.Command{
 		Type:    queue_manager.POP_MESSAGE,
 		QueueID: queueID,
 	}
 
-	// Forward to leader if not the leader
-	if !s.RaftNode.IsLeader() {
-		http.Error(w, fmt.Sprintf("Not the leader. Current leader: %s", s.RaftNode.GetLeader()), http.StatusTemporaryRedirect)
-		return
-	}
-
-	// Apply command via Raft
 	commandBytes, err := json.Marshal(command)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to marshal command: %v", err), http.StatusInternalServerError)
@@ -217,11 +183,12 @@ func (s *QueueServer) popMessageHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Return the response code
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"code": response,
 	})
 }
 
+// viewQueueHandler retrieves all messages in a queue with no side effects
 func (s *QueueServer) viewQueueHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -239,13 +206,6 @@ func (s *QueueServer) viewQueueHandler(w http.ResponseWriter, r *http.Request) {
 		QueueID: queueID,
 	}
 
-	// Forward to leader if not the leader
-	if !s.RaftNode.IsLeader() {
-		http.Error(w, fmt.Sprintf("Not the leader. Current leader: %s", s.RaftNode.GetLeader()), http.StatusTemporaryRedirect)
-		return
-	}
-
-	// Apply command via Raft
 	commandBytes, err := json.Marshal(command)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to marshal command: %v", err), http.StatusInternalServerError)
@@ -262,4 +222,51 @@ func (s *QueueServer) viewQueueHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"code": code,
 	})
+}
+
+// raftStatusHandler provides information about the Raft cluster status
+func (s *QueueServer) raftStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	isLeader := s.RaftNode.IsLeader()
+	leader := string(s.RaftNode.GetLeader())
+
+	fmt.Fprintf(w, "Raft Status:\n")
+	fmt.Fprintf(w, "  Is Leader: %v\n", isLeader)
+	fmt.Fprintf(w, "  Current Leader: %s\n", leader)
+}
+
+type joinRequest struct {
+	ID      string `json:"id"`
+	Address string `json:"address"`
+}
+
+// raftJoinHandler allows a new node to join the Raft cluster
+func (s *QueueServer) raftJoinHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req joinRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.ID == "" || req.Address == "" {
+		http.Error(w, "Missing node ID or address", http.StatusBadRequest)
+		return
+	}
+
+	future := s.RaftNode.Raft.AddVoter(raft.ServerID(req.ID), raft.ServerAddress(req.Address), 0, 0)
+	if err := future.Error(); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to add voter: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, "Node %s at %s successfully joined the cluster", req.ID, req.Address)
 }

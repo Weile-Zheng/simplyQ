@@ -1,14 +1,13 @@
 #!/bin/bash
-# filepath: /Users/weilezheng/CompSci/simplyQ/cmd/simplyq/compose.sh
 
-# Default values
+# Used for locally spin up a Raft cluster of process simulating nodes running SimplyQ
+
 NODE_COUNT=3
 BASE_PORT=10000
 HTTP_BASE_PORT=8080
 DATA_DIR="./raftdata"
 COMMAND="start"
 
-# Print usage information
 usage() {
     echo "Usage: $0 [options] [start|stop|clean|status|join]"
     echo "Options:"
@@ -25,7 +24,6 @@ usage() {
     exit 1
 }
 
-# Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         -n|--nodes)
@@ -57,13 +55,11 @@ done
 # Ensure data directory exists
 mkdir -p "$DATA_DIR"
 
-# Function to get PID file path
 get_pid_file() {
     local node_id="$1"
     echo "/tmp/simplyq_node${node_id}.pid"
 }
 
-# Function to start a node
 start_node() {
     local node_id="$1"
     local raft_port="$2"
@@ -89,7 +85,6 @@ start_node() {
     echo "Node${node_id} started with PID $!"
 }
 
-# Function to stop a node
 stop_node() {
     local node_id="$1"
     local pid_file
@@ -106,7 +101,6 @@ stop_node() {
     fi
 }
 
-# Function to check cluster status
 check_status() {
     echo "Checking cluster status..."
     for i in $(seq 1 "$NODE_COUNT"); do
@@ -117,7 +111,6 @@ check_status() {
     done
 }
 
-# Function to join follower nodes to the leader
 join_nodes() {
     local leader_http_port="$HTTP_BASE_PORT"
 
@@ -134,7 +127,6 @@ join_nodes() {
     done
 }
 
-# Command execution
 case "$COMMAND" in
     start)
         echo "Starting SimplyQ cluster with $NODE_COUNT nodes..."

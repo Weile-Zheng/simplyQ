@@ -1,5 +1,7 @@
 package queue_manager
 
+// QueueManager manages multiple message queues. 
+
 import (
 	"log"
 	"sync"
