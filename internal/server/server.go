@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -35,8 +36,8 @@ func StartNewServer(dataDir, nodeID, bindAddr string, raftPort string, httpPort 
 	http.HandleFunc("/ping", server.pingHandler)
 	http.HandleFunc("/createQueue", server.createQueueHandler)
 	http.HandleFunc("/sendMessage", server.sendMessageHandler)
-	// http.HandleFunc("/peekMessage", server.peekMessageHandler)
-	// http.HandleFunc("/deleteMessage", server.deleteMessageHandler)
+	http.HandleFunc("/peekMessage", server.peekMessageHandler)
+	http.HandleFunc("/popMessage", server.popMessageHandler)
 	http.HandleFunc("/viewAllMessages", server.viewQueueHandler)
 	http.HandleFunc("/raft/status", server.raftStatusHandler)
 	http.HandleFunc("/raft/join", server.raftJoinHandler)
@@ -60,7 +61,11 @@ func (s *QueueServer) raftStatusHandler(w http.ResponseWriter, r *http.Request) 
 	fmt.Fprintf(w, "  Current Leader: %s\n", leader)
 }
 
-// raftJoinHandler handles requests to join the Raft cluster
+type joinRequest struct {
+	ID      string `json:"id"`
+	Address string `json:"address"`
+}
+
 func (s *QueueServer) raftJoinHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -72,20 +77,22 @@ func (s *QueueServer) raftJoinHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodeID := r.URL.Query().Get("id")
-	address := r.URL.Query().Get("address")
+	var req joinRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
 
-	if nodeID == "" || address == "" {
+	if req.ID == "" || req.Address == "" {
 		http.Error(w, "Missing node ID or address", http.StatusBadRequest)
 		return
 	}
 
-	// Add the node to the Raft configuration
-	future := s.RaftNode.Raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(address), 0, 0)
+	future := s.RaftNode.Raft.AddVoter(raft.ServerID(req.ID), raft.ServerAddress(req.Address), 0, 0)
 	if err := future.Error(); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to add voter: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Fprintf(w, "Node %s at %s successfully joined the cluster", nodeID, address)
+	fmt.Fprintf(w, "Node %s at %s successfully joined the cluster", req.ID, req.Address)
 }

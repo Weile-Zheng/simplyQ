@@ -10,7 +10,7 @@ COMMAND="start"
 
 # Print usage information
 usage() {
-    echo "Usage: $0 [options] [start|stop|clean]"
+    echo "Usage: $0 [options] [start|stop|clean|status|join]"
     echo "Options:"
     echo "  -n, --nodes NUMBER    Number of nodes in the cluster (default: 3)"
     echo "  -p, --port PORT       Base port for Raft communication (default: 10000)"
@@ -77,7 +77,6 @@ start_node() {
 
     echo "Starting node${node_id} (Raft port: ${raft_port}, HTTP port: ${http_port})"
     
-    # Run the node and save PID
     NODE_ID="node${node_id}" \
     BIND_ADDR="127.0.0.1" \
     RAFT_PORT="${raft_port}" \
@@ -93,10 +92,12 @@ start_node() {
 # Function to stop a node
 stop_node() {
     local node_id="$1"
-    local pid_file="$(get_pid_file "$node_id")"
+    local pid_file
+    pid_file="$(get_pid_file "$node_id")"
     
     if [ -f "$pid_file" ]; then
-        local pid=$(cat "$pid_file")
+        local pid
+        pid=$(cat "$pid_file")
         echo "Stopping node${node_id} (PID: ${pid})"
         kill -TERM "$pid" 2>/dev/null || true
         rm -f "$pid_file"
@@ -116,41 +117,35 @@ check_status() {
     done
 }
 
-# Function to join nodes to the leader
+# Function to join follower nodes to the leader
 join_nodes() {
-    echo "Joining nodes to the leader..."
-    local leader_port=$HTTP_BASE_PORT
-    
-    # Wait for leader to be ready
-    echo "Waiting for leader to be ready..."
-    while ! curl -s "http://127.0.0.1:${leader_port}/ping" > /dev/null; do
-        sleep 1
-    done
-    
-    # Join other nodes to the leader
+    local leader_http_port="$HTTP_BASE_PORT"
+
     for i in $(seq 2 "$NODE_COUNT"); do
-        local raft_port=$((BASE_PORT + i - 1))
-        echo "Joining node${i} to the cluster..."
-        curl -X POST "http://127.0.0.1:${leader_port}/raft/join?id=node${i}&address=127.0.0.1:${raft_port}"
-        echo
-        sleep 1
+        local follower_raft_port=$((BASE_PORT + i - 1))
+        local follower_addr="127.0.0.1:${follower_raft_port}"
+        echo "Sending join request for Node${i} to leader at 127.0.0.1:${leader_http_port}"
+
+        curl -s -X POST "http://127.0.0.1:${leader_http_port}/raft/join" \
+            -H "Content-Type: application/json" \
+            -d "{\"id\": \"node${i}\", \"address\": \"${follower_addr}\"}" \
+            && echo "Node${i} joined successfully." \
+            || echo "Failed to join Node${i}"
     done
 }
 
+# Command execution
 case "$COMMAND" in
     start)
         echo "Starting SimplyQ cluster with $NODE_COUNT nodes..."
         
-        # Start nodes
         for i in $(seq 1 "$NODE_COUNT"); do
             raft_port=$((BASE_PORT + i - 1))
             http_port=$((HTTP_BASE_PORT + i - 1))
             
-            # For first node, no peers
             if [ "$i" -eq 1 ]; then
                 peers=""
             else
-                # For other nodes, set the first node as peer
                 peers="127.0.0.1:$BASE_PORT"
             fi
             
@@ -158,7 +153,12 @@ case "$COMMAND" in
             sleep 2
         done
         
-        echo "All nodes started. Use '$0 join' to join nodes to the cluster."
+        echo "All nodes started. Automatically joining nodes to the cluster..."
+        if [ "$NODE_COUNT" -gt 1 ]; then
+            join_nodes
+            echo "Verifying cluster status:"
+            check_status
+        fi
         ;;
         
     stop)
@@ -171,11 +171,9 @@ case "$COMMAND" in
         
     clean)
         echo "Cleaning up data directories..."
-        # First stop all nodes
         for i in $(seq 1 "$NODE_COUNT"); do
             stop_node "$i"
         done
-        # Then remove data directories
         rm -rf "${DATA_DIR}/node"*
         echo "Data directories cleaned."
         ;;

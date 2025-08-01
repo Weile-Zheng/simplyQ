@@ -1,5 +1,8 @@
 package queue
 
+/**
+ * Queue package provides a simple implementation of a message queue.
+ */
 import (
 	"time"
 )
